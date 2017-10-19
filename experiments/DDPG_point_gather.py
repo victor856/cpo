@@ -17,7 +17,7 @@ from sandbox.cpo.baselines.gaussian_mlp_baseline import GaussianMLPBaseline
 from sandbox.cpo.envs.mujoco.gather.point_gather_env import PointGatherEnv
 
 # Policy optimization
-from rllab.algos.ddpg import DDPG
+from sandbox.cpo.algos.safe.pdo_ddpg import PDODDPG
 from sandbox.cpo.optimizers.conjugate_gradient_optimizer import ConjugateGradientOptimizer
 from sandbox.cpo.safety_constraints.gather import GatherSafetyConstraint
 from rllab.exploration_strategies.ou_strategy import OUStrategy

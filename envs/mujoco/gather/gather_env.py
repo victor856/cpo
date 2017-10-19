@@ -270,6 +270,7 @@ class GatherEnv(Env, Serializable):
         com = self.inner_env.get_body_com("torso")
         x, y = com[:2]
         reward = 0
+        cost = 0
         new_objs = []
         for obj in self.objects:
             ox, oy, typ = obj
@@ -279,13 +280,13 @@ class GatherEnv(Env, Serializable):
                     reward = reward + self.apple_reward
                     info['apples'] = 1
                 else:
-                    reward = reward - self.bomb_cost
+                    cost = cost + self.bomb_cost
                     info['bombs'] = 1
             else:
                 new_objs.append(obj)
         self.objects = new_objs
         done = len(self.objects) == 0
-        return Step(self.get_current_obs(), reward, done, **info)
+        return Step(self.get_current_obs(), reward, cost, done, **info)
 
     def get_readings(self):
         # compute sensor readings

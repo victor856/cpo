@@ -15,9 +15,9 @@ import rllab.misc.logger as logger
 import theano
 import theano.tensor as TT
 import csv
-
-
 from sandbox.cpo.algos.safe.sampler_safe import BatchSamplerSafe
+
+
 
 class PolicyGradientSafe(BatchPolopt, Serializable):
     """
@@ -382,12 +382,12 @@ class PolicyGradientSafe(BatchPolopt, Serializable):
 
 
         if self.learn_safety_tradeoff_coeff:
-            beta = 0.5
+            # beta = 0
             delta = samples_data['safety_eval'] - self.safety_step_size
-            momentum = self.safety_tradeoff_coeff - self.prev_safe_coeff
+            # momentum = self.safety_tradeoff_coeff - self.prev_safe_coeff
             self.prev_safe_coeff = self.safety_tradeoff_coeff
             logger.record_tabular('delta', delta)
-            logger.record_tabular('momentum', momentum)
+            # logger.record_tabular('momentum', momentum)
             logger.record_tabular('TradeoffCoeffBefore',self.safety_tradeoff_coeff)
             self.safety_tradeoff_coeff +=  (self.safety_tradeoff_coeff_lr * delta + beta * momentum)
             self.safety_tradeoff_coeff = max(0, self.safety_tradeoff_coeff)
