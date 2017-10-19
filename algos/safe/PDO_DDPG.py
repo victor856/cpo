@@ -109,7 +109,7 @@ class PDO_DDPG(RLAlgorithm):
             qf_update_method='adam',
             qf_cost_update_method='adam',
             qf_learning_rate=1e-3,
-            qf_cost_learning_rate=1e-3, 
+            qf_cost_learning_rate=1e-3,
             safety_constraint=None,
             dual_learning_rate=0.01,
             policy_weight_decay=0,

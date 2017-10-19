@@ -1,4 +1,5 @@
 import sys
+import csv
 
 sys.path.append(".")
 
@@ -11,13 +12,13 @@ import lasagne.nonlinearities as NL
 from rllab.policies.deterministic_mlp_policy import DeterministicMLPPolicy
 
 # Baseline
-from sandbox.cpo.baselines.gaussian_mlp_baseline import GaussianMLPBaseline
+#from sandbox.cpo.baselines.gaussian_mlp_baseline import GaussianMLPBaseline
 
 # Environment
 from sandbox.cpo.envs.mujoco.gather.point_gather_env import PointGatherEnv
 
 # Policy optimization
-from sandbox.cpo.algos.safe.pdo_ddpg import PDODDPG
+from sandbox.cpo.algos.safe.pdo_ddpg import PDO_DDPG
 from sandbox.cpo.optimizers.conjugate_gradient_optimizer import ConjugateGradientOptimizer
 from sandbox.cpo.safety_constraints.gather import GatherSafetyConstraint
 from rllab.exploration_strategies.ou_strategy import OUStrategy
@@ -35,7 +36,7 @@ def run_task(*_):
 
         #policy = GaussianMLPPolicy(env.spec,
                     #hidden_sizes=(64,32)
-                 #)
+                    #)
         policy = DeterministicMLPPolicy(
             env_spec=env.spec,
             hidden_sizes=(64, 32)
@@ -44,6 +45,7 @@ def run_task(*_):
         es = OUStrategy(env_spec=env.spec)
 
         qf = ContinuousMLPQFunction(env_spec=env.spec)
+        qf_cost = ContinuousMLPQFunction(env_spec=env.spec)
 
         #baseline = GaussianMLPBaseline(
             #env_spec=env.spec,
@@ -56,17 +58,19 @@ def run_task(*_):
                     #}
         #)
 
-        #safety_constraint = GatherSafetyConstraint(max_value=0.1)
+        safety_constraint = GatherSafetyConstraint(max_value=0.1)
 
 
 
-        algo = DDPG(
+        algo = PDO_DDPG(
             env=env,
             policy=policy,
             es=es,
             qf=qf,
+            qf_cost=qf_cost,
+            dual_var=0,
             #baseline=baseline,
-            #safety_constraint=safety_constraint,
+            safety_constraint=safety_constraint,
             batch_size=32,
             max_path_length=100,
             epoch_length=1000,
@@ -75,13 +79,19 @@ def run_task(*_):
             #n_itr=100,
             #gae_lambda=0.95,
             discount=0.99,
+            qf_weight_decay=0.,
+            qf_update_method='adam',
+            qf_cost_update_method='adam',
             qf_learning_rate=1e-3,
+            qf_cost_learning_rate=1e-3,
+            dual_learning_rate=0.01,
+            policy_weight_decay=0,
+            policy_update_method='adam',
             policy_learning_rate=1e-4,
-            scale_reward=0.01,
+            scale_reward=1.0,
+            scale_cost=1.0,
             soft_target=True,
             soft_target_tau=0.001,
-            step_size=trpo_stepsize,
-            optimizer_args={'subsample_factor':trpo_subsample_factor},
             #plot=True,
         )
 
@@ -90,9 +100,9 @@ def run_task(*_):
 
 run_experiment_lite(
     run_task,
-    n_parallel=1,
+    n_parallel=2,
     snapshot_mode="last",
-    exp_prefix='DDPG-PointGather',
+    exp_prefix='PDO_DDPG-PointGather',
     seed=1,
     mode = "ec2" if ec2_mode else "local"
     #plot=True
