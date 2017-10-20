@@ -286,7 +286,8 @@ class GatherEnv(Env, Serializable):
                 new_objs.append(obj)
         self.objects = new_objs
         done = len(self.objects) == 0
-        return Step(self.get_current_obs(), reward, cost, done, **info)
+        info['cost'] = cost
+        return Step(self.get_current_obs(), reward, done, **info)
 
     def get_readings(self):
         # compute sensor readings

@@ -11,6 +11,7 @@ import pickle as pickle
 import numpy as np
 import pyprind
 import lasagne
+import csv
 
 
 def parse_update_method(update_method, **kwargs):
@@ -95,9 +96,9 @@ class PDO_DDPG(RLAlgorithm):
             env,
             policy,
             qf,
-            qf_cost,
-            dual_var=0,
+            qf_cost,            
             es,
+            dual_var=0,
             batch_size=32,
             n_epochs=200,
             epoch_length=1000,
@@ -180,7 +181,7 @@ class PDO_DDPG(RLAlgorithm):
             )
         self.qf_learning_rate = qf_learning_rate
         self.qf_cost_learning_rate = qf_cost_learning_rate
-        self.safety_constraint = self.safety_constraint
+        self.safety_constraint = safety_constraint
         self.cost_constraint = self.safety_constraint.get_safety_step()
         self.dual_learning_rate = dual_learning_rate
         self.policy_weight_decay = policy_weight_decay
@@ -206,12 +207,16 @@ class PDO_DDPG(RLAlgorithm):
         self.z_averages = []
         self.paths = []
         self.es_path_returns = []
+        self.es_path_costs = []
         self.paths_samples_cnt = 0
 
         self.scale_reward = scale_reward
         self.scale_cost = scale_cost
 
         self.opt_info = None
+        self.target_policy = pickle.loads(pickle.dumps(self.policy))
+        self.target_qf = pickle.loads(pickle.dumps(self.qf))
+        self.target_qf_cost = pickle.loads(pickle.dumps(self.qf_cost))
 
     def start_worker(self):
         parallel_sampler.populate_task(self.env, self.policy)
@@ -220,6 +225,7 @@ class PDO_DDPG(RLAlgorithm):
 
     @overrides
     def train(self):
+
         # This seems like a rather sequential method
         pool = SimpleReplayPool(
             max_pool_size=self.replay_pool_size,
@@ -257,7 +263,8 @@ class PDO_DDPG(RLAlgorithm):
                     path_cost = 0
                 action = self.es.get_action(itr, observation, policy=sample_policy)  # qf=qf)
 
-                next_observation, reward, cost, terminal, _ = self.env.step(action)
+                next_observation, reward, terminal, info = self.env.step(action)
+                cost = info['cost']
                 path_length += 1
                 path_return += reward
                 path_cost += cost
@@ -296,12 +303,7 @@ class PDO_DDPG(RLAlgorithm):
         self.env.terminate()
         self.policy.terminate()
 
-    def init_opt(self):
-
-        # First, create "target" policy and Q functions
-        target_policy = pickle.loads(pickle.dumps(self.policy))
-        target_qf = pickle.loads(pickle.dumps(self.qf))
-        target_qf_cost = pickle.loads(pickle.dumps(self.qf_cost))
+    def init_opt(self):  
 
         # y need to be computed first
         obs = self.env.observation_space.new_tensor_variable(
@@ -315,9 +317,11 @@ class PDO_DDPG(RLAlgorithm):
             'action',
             extra_dims=1,
         )
+
+
         yvar = TT.vector('ys')
         zvar = TT.vector('zs')
-        #Theano tensor as "TT"
+        dual = TT.dscalar('dv')
 
         # Regularization
         qf_weight_decay_term = 0.5 * self.qf_weight_decay * \
@@ -340,8 +344,9 @@ class PDO_DDPG(RLAlgorithm):
         policy_weight_decay_term = 0.5 * self.policy_weight_decay * \
                                    sum([TT.sum(TT.square(param))
                                         for param in self.policy.get_params(regularizable=True)])
-        policy_qval = self.qf.get_qval_sym(obs, self.policy.get_action_sym(obs), deterministic=True) \
-            - dual_var * self.qf_cost.get_qval_sym(obs, self.policy.get_action_sym(obs), deterministic=True)
+
+        policy_qval = self.qf.get_qval_sym(obs, self.policy.get_action_sym(obs), deterministic=True) - \
+             dual * self.qf_cost.get_qval_sym(obs, self.policy.get_action_sym(obs), deterministic=True)
 
         policy_surr = -TT.mean(policy_qval)
         policy_reg_surr = policy_surr + policy_weight_decay_term
@@ -366,7 +371,7 @@ class PDO_DDPG(RLAlgorithm):
         )
 
         f_train_policy = ext.compile_function(
-            inputs=[obs],
+            inputs=[obs, dual],
             outputs=policy_surr,
             updates=policy_updates
         )
@@ -375,10 +380,8 @@ class PDO_DDPG(RLAlgorithm):
             f_train_qf=f_train_qf,
             f_train_qf_cost=f_train_qf_cost,
             f_train_policy=f_train_policy,
-            target_qf=target_qf,
-            target_qf_cost=target_qf_cost,
-            target_policy=target_policy,
         )
+
 
     def do_training(self, itr, batch):
 
@@ -388,18 +391,14 @@ class PDO_DDPG(RLAlgorithm):
             "terminals"
         )
 
-        # compute the on-policy y values
-        target_qf = self.opt_info["target_qf"]
-        target_qf_cost = self.opt_info["target_qf_cost"]
-        target_policy = self.opt_info["target_policy"]
-
-        next_actions, _ = target_policy.get_actions(next_obs)
-        next_qvals = target_qf.get_qval(next_obs, next_actions)
-        next_qvals_cost = target_qf_cost.get_qval(next_obs, next_actions)
+        next_actions, _ = self.target_policy.get_actions(next_obs)
+        next_qvals = self.target_qf.get_qval(next_obs, next_actions)
+        next_qvals_cost = self.target_qf_cost.get_qval(next_obs, next_actions)
 
     
         ys = rewards + (1. - terminals) * self.discount * next_qvals
         zs = costs + (1. - terminals) * self.discount * next_qvals_cost
+        dv = self.dual_var
 
         f_train_qf = self.opt_info["f_train_qf"]
         f_train_qf_cost = self.opt_info["f_train_qf_cost"]
@@ -407,29 +406,35 @@ class PDO_DDPG(RLAlgorithm):
 
         qf_loss, qval = f_train_qf(ys, obs, actions)
         qf_cost_loss, qval_cost = f_train_qf_cost(zs, obs, actions)
-        policy_surr = f_train_policy(obs)
+        opt_actions,_ = self.policy.get_actions(obs)
+        val_func_reward = self.qf.get_qval(obs, opt_actions)
+        val_func_cost = self.qf_cost.get_qval(obs, opt_actions)
+        policy_surr = f_train_policy(obs, dv)
+
+
 
         #Update the target networks
-        target_policy.set_param_values(
-            target_policy.get_param_values() * (1.0 - self.soft_target_tau) +
+        self.target_policy.set_param_values(
+            self.target_policy.get_param_values() * (1.0 - self.soft_target_tau) +
             self.policy.get_param_values() * self.soft_target_tau)
-        target_qf.set_param_values(
-            target_qf.get_param_values() * (1.0 - self.soft_target_tau) +
+        self.target_qf.set_param_values(
+            self.target_qf.get_param_values() * (1.0 - self.soft_target_tau) +
             self.qf.get_param_values() * self.soft_target_tau)
-        target_qf_cost.set_param_values(
-            target_qf_cost.get_param_values() * (1.0 - self.soft_target_tau) +
+        self.target_qf_cost.set_param_values(
+            self.target_qf_cost.get_param_values() * (1.0 - self.soft_target_tau) +
             self.qf_cost.get_param_values() * self.soft_target_tau)
 
         #Update dual variable using the sampled gradient
-        gradient_dual = np.mean(qf_cost.get_qval(obs,self.policy.get_action(obs)) - self.cost_constraint)
-        dual_var = max(0, dual_var + dual_learning_rate * gradient_dual) 
+        opt_actions,_ = self.policy.get_actions(obs)
+        gradient_dual = np.mean(self.qf_cost.get_qval(obs, opt_actions) - self.scale_cost * self.cost_constraint)
+        self.dual_var = max(0, self.dual_var + self.dual_learning_rate * gradient_dual) 
 
 
         self.qf_loss_averages.append(qf_loss)
-        self.qf_cost_loss_averages.append(qf_cost_losss)
-        self.policy_surr_averages.append(policy_surr)
-        self.q_averages.append(qval)
-        self.q_cost_averages.append(qval_cost)
+        self.qf_cost_loss_averages.append(qf_cost_loss)
+        self.policy_surr_averages.append(-policy_surr)
+        self.q_averages.append(val_func_reward)
+        self.q_cost_averages.append(val_func_cost)
         self.y_averages.append(ys)
         self.z_averages.append(zs)
 
@@ -445,13 +450,11 @@ class PDO_DDPG(RLAlgorithm):
             [special.discount_return(path["rewards"], self.discount) for path in paths]
         )
 
-        #is there a discount_cost def??
-        average_discounted_cost = np.mean(
-            [special.discount_return(path["costs"], self.discount) for path in paths]
-        )
 
         returns = [sum(path["rewards"]) for path in paths]
-        costs = [sum(path["costs"]) for path in paths]
+        for path in paths:
+            path["safety_rewards"] = self.safety_constraint.evaluate(path)
+        costs = [sum(path["safety_rewards"]) for path in paths]
 
         all_qs = np.concatenate(self.q_averages)
         all_qs_cost = np.concatenate(self.q_cost_averages)
@@ -494,21 +497,30 @@ class PDO_DDPG(RLAlgorithm):
                               average_discounted_return)
         logger.record_tabular('AverageQLoss', average_q_loss)
         logger.record_tabular('AveragePolicySurr', average_policy_surr)
-        logger.record_tabular('AverageQ', np.mean(all_qs))
-        logger.record_tabular('AverageAbsQ', np.mean(np.abs(all_qs)))
-        logger.record_tabular('AverageY', np.mean(all_ys))
-        logger.record_tabular('AverageAbsY', np.mean(np.abs(all_ys)))
-        logger.record_tabular('AverageAbsQYDiff',
-                              np.mean(np.abs(all_qs - all_ys)))
-        logger.record_tabular('AverageAction', average_action)
+        logger.record_tabular('EstimatedQ', np.mean(all_qs))
+        #logger.record_tabular('AverageAbsQ', np.mean(np.abs(all_qs)))
+        #logger.record_tabular('AverageY', np.mean(all_ys))
+        #logger.record_tabular('AverageAbsY', np.mean(np.abs(all_ys)))
+        #logger.record_tabular('AverageAbsQYDiff',
+        #                      np.mean(np.abs(all_qs - all_ys)))
+        #logger.record_tabular('AverageAction', average_action)
 
-        logger.record_tabular('PolicyRegParamNorm',
-                              policy_reg_param_norm)
-        logger.record_tabular('QFunRegParamNorm',
-                              qfun_reg_param_norm)
-
+        #logger.record_tabular('PolicyRegParamNorm',
+        #                      policy_reg_param_norm)
+        #logger.record_tabular('QFunRegParamNorm',
+        #                      qfun_reg_param_norm)
+        logger.record_tabular('EstimatedQcost', np.mean(all_qs_cost))
+        #logger.record_tabular('AverageZ', np.mean(all_zs))
+        logger.record_tabular('AverageQcostLoss', average_q_cost_loss)
+        logger.record_tabular('AverageCosts', np.mean(costs))
+        logger.record_tabular('DualVariable', self.dual_var)
         self.env.log_diagnostics(paths)
         self.policy.log_diagnostics(paths)
+
+        f = open("/home/qingkai/ddpg_performance.csv", 'a')
+        writer = csv.writer(f, delimiter=',')
+        writer.writerow((epoch, np.mean(returns), np.mean(costs), self.dual_var, np.mean(all_qs), np.mean(all_qs_cost)))
+        f.close()
 
 
         self.qf_loss_averages = []
@@ -529,8 +541,10 @@ class PDO_DDPG(RLAlgorithm):
             env=self.env,
             epoch=epoch,
             qf=self.qf,
+            qf_cost=self.qf_cost,
             policy=self.policy,
-            target_qf=self.opt_info["target_qf"],
-            target_policy=self.opt_info["target_policy"],
+            target_qf=self.target_qf,
+            target_policy=self.target_policy,
+            target_qf_cost=self.target_qf_cost,
             es=self.es,
         )
