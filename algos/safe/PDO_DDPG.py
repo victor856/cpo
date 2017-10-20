@@ -497,7 +497,7 @@ class PDO_DDPG(RLAlgorithm):
                               average_discounted_return)
         logger.record_tabular('AverageQLoss', average_q_loss)
         logger.record_tabular('AveragePolicySurr', average_policy_surr)
-        logger.record_tabular('EstimatedQ', np.mean(all_qs))
+        logger.record_tabular('EstimatedQ', np.mean(all_qs)/self.scale_reward)
         #logger.record_tabular('AverageAbsQ', np.mean(np.abs(all_qs)))
         #logger.record_tabular('AverageY', np.mean(all_ys))
         #logger.record_tabular('AverageAbsY', np.mean(np.abs(all_ys)))
@@ -509,7 +509,7 @@ class PDO_DDPG(RLAlgorithm):
         #                      policy_reg_param_norm)
         #logger.record_tabular('QFunRegParamNorm',
         #                      qfun_reg_param_norm)
-        logger.record_tabular('EstimatedQcost', np.mean(all_qs_cost))
+        logger.record_tabular('EstimatedQcost', np.mean(all_qs_cost)/self.scale_cost)
         #logger.record_tabular('AverageZ', np.mean(all_zs))
         logger.record_tabular('AverageQcostLoss', average_q_cost_loss)
         logger.record_tabular('AverageCosts', np.mean(costs))
@@ -519,7 +519,7 @@ class PDO_DDPG(RLAlgorithm):
 
         f = open("/home/qingkai/ddpg_performance.csv", 'a')
         writer = csv.writer(f, delimiter=',')
-        writer.writerow((epoch, np.mean(returns), np.mean(costs), self.dual_var, np.mean(all_qs), np.mean(all_qs_cost)))
+        writer.writerow((epoch, np.mean(returns), np.mean(costs), self.dual_var, np.mean(all_qs)/self.scale_reward, np.mean(all_qs_cost)/self.scale_cost))
         f.close()
 
 
