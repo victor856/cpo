@@ -222,7 +222,7 @@ class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
                 self.pdo_ddpg.train()
                 samples_data = self.sampler.process_samples(itr, paths)
                 self.log_diagnostics(paths)
-                self.optimize_policy(itr, samples_data)
+                self.optimize_policy(itr, samples_data)               
                 logger.log("saving snapshot...")
                 params = self.get_itr_snapshot(itr, samples_data)
                 self.current_itr = itr + 1

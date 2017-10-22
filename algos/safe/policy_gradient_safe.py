@@ -55,7 +55,7 @@ class PolicyGradientSafe(BatchPolopt, Serializable):
             attempt_infeasible_recovery=True,
             revert_to_last_safe_point=False,
             safety_tradeoff=False,
-            safety_tradeoff_coeff=1,
+            safety_tradeoff_coeff=0,
             learn_safety_tradeoff_coeff=False,
             prev_safe_coeff = 0,
             safety_tradeoff_coeff_lr=1,
@@ -168,6 +168,32 @@ class PolicyGradientSafe(BatchPolopt, Serializable):
         if self.safety_constraint and self.safety_tradeoff and self.pdo_vf_mode == 1:
             self.baseline._target_key = 'tradeoff_returns'
         
+    @overrides
+    def train(self):
+        self.start_worker()
+        self.init_opt()
+        for itr in range(self.current_itr, self.n_itr):
+            with logger.prefix('itr #%d | ' % itr):
+                paths = self.sampler.obtain_samples(itr)
+                samples_data = self.sampler.process_samples(itr, paths)
+                self.log_diagnostics(paths)
+                self.optimize_policy(itr, samples_data)                
+                logger.log("saving snapshot...")
+                params = self.get_itr_snapshot(itr, samples_data)
+                self.current_itr = itr + 1
+                params["algo"] = self
+                if self.store_paths:
+                    params["paths"] = samples_data["paths"]
+                logger.save_itr_params(itr, params)
+                logger.log("saved")
+                logger.dump_tabular(with_prefix=False)
+                if self.plot:
+                    self.update_plot()
+                    if self.pause_for_plot:
+                        input("Plotting evaluation run: Press Enter to "
+                                  "continue...")
+
+        self.shutdown_worker()
 
     @overrides
     def init_opt(self):
@@ -389,7 +415,7 @@ class PolicyGradientSafe(BatchPolopt, Serializable):
             logger.record_tabular('delta', delta)
             # logger.record_tabular('momentum', momentum)
             logger.record_tabular('TradeoffCoeffBefore',self.safety_tradeoff_coeff)
-            self.safety_tradeoff_coeff +=  (self.safety_tradeoff_coeff_lr * delta + beta * momentum)
+            self.safety_tradeoff_coeff +=  self.safety_tradeoff_coeff_lr * delta 
             self.safety_tradeoff_coeff = max(0, self.safety_tradeoff_coeff)
             logger.record_tabular('TradeoffCoeffAfter',self.safety_tradeoff_coeff)
             csv_file = open("/home/qingkai/dual.csv", 'a')

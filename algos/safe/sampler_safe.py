@@ -583,10 +583,13 @@ class BatchSamplerSafe(Sampler):
                     logger.record_tabular('NewPathsStdRobustSafety[U]Return', np.std(new_safety_robust_returns))
                     logger.record_tabular('NewPathsMaxRobustSafety[U]Return', np.max(new_safety_robust_returns))
 
-        csv_file = open("/home/qingkai/verina.csv", 'a')
-        writer = csv.writer(csv_file, delimiter=',')
-        writer.writerow((itr, average_discounted_return, samples_data['safety_eval']))
-        csv_file.close()
+         # write statistics to disk
+        f = open("/home/qingkai/verina.csv", 'a')
+        writer = csv.writer(f, delimiter=',')               
+        writer.writerow((itr, average_discounted_return, samples_data['safety_eval'], \
+            self.algo.safety_tradeoff_coeff))
+        f.close() 
+
 
     def get_IS(self,age):
         if self.algo.decision_weight_mode=='pd':

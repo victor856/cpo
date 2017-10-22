@@ -89,9 +89,9 @@ def run_task(*_):
             ddpg_dual_learning_rate=0.01,
             ddpg_policy_learning_rate=1e-3,
             ddpg_scale_reward=1,
-            ddpg_scale_cost=1,
+            ddpg_scale_cost=10,
             offline_itr_n=5000,
-            balance=1,           
+            balance=0,           
             #plot=True,
         )
 
