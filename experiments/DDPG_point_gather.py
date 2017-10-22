@@ -60,7 +60,7 @@ def run_task(*_):
             safety_constraint=safety_constraint,
             batch_size=128,
             max_path_length=15,
-            epoch_length=5000,
+            epoch_length=10000,
             min_pool_size=10000,
             n_epochs=200,
             discount=0.99,
@@ -69,7 +69,7 @@ def run_task(*_):
             qf_cost_update_method='adam',
             qf_learning_rate=1e-3,
             qf_cost_learning_rate=1e-3,
-            dual_learning_rate=0.01,
+            dual_learning_rate=1e-3,
             policy_weight_decay=0,
             policy_update_method='adam',
             policy_learning_rate=1e-3,
@@ -87,7 +87,7 @@ def run_task(*_):
 
 run_experiment_lite(
     run_task,
-    n_parallel=1,
+    n_parallel=4,
     snapshot_mode="last",
     exp_prefix='PDO_DDPG-PointGather',
     seed=1,

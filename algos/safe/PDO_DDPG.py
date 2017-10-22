@@ -105,7 +105,7 @@ class PDO_DDPG(RLAlgorithm):
             min_pool_size=10000,
             replay_pool_size=1000000,
             discount=0.99,
-            max_path_length=250,
+            max_path_length=15,
             qf_weight_decay=0.,
             qf_update_method='adam',
             qf_cost_update_method='adam',
@@ -124,6 +124,8 @@ class PDO_DDPG(RLAlgorithm):
             scale_cost=1.0,
             include_horizon_terminal_transitions=False,
             plot=False,
+            offline_mode=False,
+            offline_itr_n=10000,
             pause_for_plot=False):
         """
         :param env: Environment
@@ -218,6 +220,15 @@ class PDO_DDPG(RLAlgorithm):
         self.target_qf = pickle.loads(pickle.dumps(self.qf))
         self.target_qf_cost = pickle.loads(pickle.dumps(self.qf_cost))
 
+        self.pool = SimpleReplayPool(
+            max_pool_size=self.replay_pool_size,
+            observation_dim=self.env.observation_space.flat_dim,
+            action_dim=self.env.action_space.flat_dim,
+        )
+
+        self.offline_mode = offline_mode
+        self.offline_itr_n = offline_itr_n
+
     def start_worker(self):
         parallel_sampler.populate_task(self.env, self.policy)
         if self.plot:
@@ -226,82 +237,84 @@ class PDO_DDPG(RLAlgorithm):
     @overrides
     def train(self):
 
-        # This seems like a rather sequential method
-        pool = SimpleReplayPool(
-            max_pool_size=self.replay_pool_size,
-            observation_dim=self.env.observation_space.flat_dim,
-            action_dim=self.env.action_space.flat_dim,
-        )
-        self.start_worker()
-
         self.init_opt()
-        itr = 0
-        path_length = 0
-        path_return = 0
-        path_cost = 0
-        terminal = False
-        observation = self.env.reset()
+        # This seems like a rather sequential method
+        if self.offline_mode:
+            for itr in range(self.offline_itr_n):
+                # train policy
+                batch = self.pool.random_batch(self.batch_size)
+                self.do_training(itr, batch)
 
-        sample_policy = pickle.loads(pickle.dumps(self.policy))
 
-        for epoch in range(self.n_epochs):
-            logger.push_prefix('epoch #%d | ' % epoch)
-            logger.log("Training started")
-            for epoch_itr in pyprind.prog_bar(range(self.epoch_length)):
-                # Execute policy
-                if terminal:  # or path_length > self.max_path_length:
-                    # Note that if the last time step ends an episode, the very
-                    # last state and observation will be ignored and not added
-                    # to the replay pool
-                    observation = self.env.reset()
-                    self.es.reset()
-                    sample_policy.reset()
-                    self.es_path_returns.append(path_return)
-                    self.es_path_costs.append(path_cost)
-                    path_length = 0
-                    path_return = 0
-                    path_cost = 0
-                action = self.es.get_action(itr, observation, policy=sample_policy)  # qf=qf)
+        if not self.offline_mode:
+            self.start_worker()
+            itr = 0
+            path_length = 0
+            path_return = 0
+            path_cost = 0
+            terminal = False
+            observation = self.env.reset()
 
-                next_observation, reward, terminal, info = self.env.step(action)
-                cost = info['cost']
-                path_length += 1
-                path_return += reward
-                path_cost += cost
+            sample_policy = pickle.loads(pickle.dumps(self.policy))
+            for epoch in range(self.n_epochs):
+                logger.push_prefix('epoch #%d | ' % epoch)
+                logger.log("Training started")
+                for epoch_itr in pyprind.prog_bar(range(self.epoch_length)):
+                    # Execute policy
+                    if terminal:  # or path_length > self.max_path_length:
+                        # Note that if the last time step ends an episode, the very
+                        # last state and observation will be ignored and not added
+                        # to the replay pool
+                        observation = self.env.reset()
+                        self.es.reset()
+                        sample_policy.reset()
+                        self.es_path_returns.append(path_return)
+                        self.es_path_costs.append(path_cost)
+                        path_length = 0
+                        path_return = 0
+                        path_cost = 0
 
-                if not terminal and path_length >= self.max_path_length:
-                    terminal = True
-                    # only include the terminal transition in this case if the flag was set
-                    if self.include_horizon_terminal_transitions:
-                        pool.add_sample(observation, action, reward * self.scale_reward, cost * self.scale_cost, terminal)
-                else:
-                    pool.add_sample(observation, action, reward * self.scale_reward, cost * self.scale_cost, terminal)
+                    action = self.es.get_action(itr, observation, policy=sample_policy)  # qf=qf)
+                    next_observation, reward, terminal, info = self.env.step(action)
+                    cost = info['cost']
 
-                observation = next_observation
+                    path_length += 1
+                    path_return += reward
+                    path_cost += cost
 
-                if pool.size >= self.min_pool_size:
-                    for update_itr in range(self.n_updates_per_sample):
-                        # Train policy
-                        batch = pool.random_batch(self.batch_size)
-                        self.do_training(itr, batch)
-                    sample_policy.set_param_values(self.policy.get_param_values())
+                    if not terminal and path_length >= self.max_path_length:
+                        terminal = True
+                        # only include the terminal transition in this case if the flag was set
+                        if self.include_horizon_terminal_transitions:
+                            self.pool.add_sample(observation, action, reward * self.scale_reward, cost * self.scale_cost, terminal)
+                    else:
+                        self.pool.add_sample(observation, action, reward * self.scale_reward, cost * self.scale_cost, terminal)
 
-                itr += 1
+                    observation = next_observation
 
-            logger.log("Training finished")
-            if pool.size >= self.min_pool_size:
-                self.evaluate(epoch, pool)
-                params = self.get_epoch_snapshot(epoch)
-                logger.save_itr_params(epoch, params)
-            logger.dump_tabular(with_prefix=False)
-            logger.pop_prefix()
-            if self.plot:
-                self.update_plot()
-                if self.pause_for_plot:
-                    input("Plotting evaluation run: Press Enter to "
-                              "continue...")
-        self.env.terminate()
-        self.policy.terminate()
+                    if self.pool.size >= self.min_pool_size:
+                        for update_itr in range(self.n_updates_per_sample):
+                            # Train policy
+                            batch = self.pool.random_batch(self.batch_size)
+                            self.do_training(itr, batch)
+                        sample_policy.set_param_values(self.policy.get_param_values())
+
+                    itr += 1
+
+                logger.log("Training finished")
+                if self.pool.size >= self.min_pool_size:
+                    self.evaluate(epoch, self.pool)
+                    params = self.get_epoch_snapshot(epoch)
+                    logger.save_itr_params(epoch, params)
+                logger.dump_tabular(with_prefix=False)
+                logger.pop_prefix()
+                if self.plot:
+                    self.update_plot()
+                    if self.pause_for_plot:
+                        input("Plotting evaluation run: Press Enter to "
+                                  "continue...")
+            self.env.terminate()
+            self.policy.terminate()
 
     def init_opt(self):  
 
@@ -426,7 +439,8 @@ class PDO_DDPG(RLAlgorithm):
 
         #Update dual variable using the sampled gradient
         opt_actions,_ = self.policy.get_actions(obs)
-        gradient_dual = np.mean(self.qf_cost.get_qval(obs, opt_actions) - self.scale_cost * self.cost_constraint)
+        gradient_dual = np.mean(self.qf_cost.get_qval(obs, opt_actions) - \
+            self.scale_cost * self.cost_constraint)
         self.dual_var = max(0, self.dual_var + self.dual_learning_rate * gradient_dual) 
 
 
@@ -437,6 +451,15 @@ class PDO_DDPG(RLAlgorithm):
         self.q_cost_averages.append(val_func_cost)
         self.y_averages.append(ys)
         self.z_averages.append(zs)
+
+    def update_replay_pool_in_batch(self, batch_paths):
+            for path in batch_paths:
+                path["safety_rewards"] = self.safety_constraint.evaluate(path)
+                for i in range(len(path['rewards'])):
+                    self.pool.add_sample(path['observations'][i], \
+                        path['actions'][i], \
+                        path['rewards'][i] * self.scale_reward, \
+                        path['safety_rewards'][i] * self.scale_cost, False)
 
     def evaluate(self, epoch, pool):
         logger.log("Collecting samples for evaluation")
@@ -519,7 +542,8 @@ class PDO_DDPG(RLAlgorithm):
 
         f = open("/home/qingkai/ddpg_performance.csv", 'a')
         writer = csv.writer(f, delimiter=',')
-        writer.writerow((epoch, np.mean(returns), np.mean(costs), self.dual_var, np.mean(all_qs)/self.scale_reward, np.mean(all_qs_cost)/self.scale_cost))
+        writer.writerow((epoch, np.mean(returns), np.mean(costs), self.dual_var, \
+            np.mean(all_qs)/self.scale_reward, np.mean(all_qs_cost)/self.scale_cost))
         f.close()
 
 
