@@ -29,7 +29,6 @@ ec2_mode = False
 
 def run_task(*_):
         f = open('/home/qingkai/verina.csv', "w+")
-        ff = open('/home/qingkai/dual.csv', "w+")
         trpo_stepsize = 0.01
         trpo_subsample_factor = 0.2
         
@@ -85,7 +84,6 @@ def run_task(*_):
         algo.train()
 
         f.close()
-        ff.close()
 
 run_experiment_lite(
     run_task,
