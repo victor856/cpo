@@ -17,7 +17,9 @@ import theano.tensor as TT
 import csv
 from sandbox.cpo.algos.safe.sampler_safe import BatchSamplerSafe
 from sandbox.cpo.algos.safe.PDO_DDPG import PDO_DDPG
-
+from rllab.policies.deterministic_mlp_policy import DeterministicMLPPolicy
+from rllab.q_functions.continuous_mlp_q_function import ContinuousMLPQFunction
+import pickle as pickle
 
 class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
     """
@@ -218,6 +220,20 @@ class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
             with logger.prefix('itr #%d | ' % itr):
                 paths = self.sampler.obtain_samples(itr)
                 logger.log('Calculating off-policy dual variable...')
+                # # reinitialize ddpg
+                # po = DeterministicMLPPolicy(
+                #     env_spec=self.env.spec,
+                #     hidden_sizes=(64, 32)
+                # )
+                # qf = ContinuousMLPQFunction(env_spec=self.env.spec)
+                # qf_cost = ContinuousMLPQFunction(env_spec=self.env.spec)
+                # self.pdo_ddpg.dual_var = 0
+                # self.pdo_ddpg.policy = po
+                # self.pdo_ddpg.qf = qf
+                # self.pdo_ddpg.qf_cost = qf_cost
+                # self.target_policy = pickle.loads(pickle.dumps(po))
+                # self.target_qf = pickle.loads(pickle.dumps(qf))
+                # self.target_qf_cost = pickle.loads(pickle.dumps(qf_cost)) 
                 self.pdo_ddpg.update_replay_pool_in_batch(paths)
                 self.pdo_ddpg.train()
                 samples_data = self.sampler.process_samples(itr, paths)
@@ -460,6 +476,9 @@ class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
             logger.record_tabular('On-policy Dual', self.pdo_dual)  
             logger.record_tabular('Off-policy Dual', self.pdo_ddpg.dual_var)  
             logger.record_tabular('DualfAfter',self.safety_tradeoff_coeff)
+            all_qs_cost = np.concatenate(self.pdo_ddpg.q_cost_averages)
+            self.pdo_ddpg.q_cost_averages = []
+            logger.record_tabular('EstimatedCost', np.mean(all_qs_cost)/self.pdo_ddpg.scale_cost)
             
         logger.record_tabular('Time',time.time() - self.start_time)
         logger.record_tabular('LossBefore', loss_before)

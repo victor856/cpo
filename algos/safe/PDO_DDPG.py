@@ -413,6 +413,7 @@ class PDO_DDPG(RLAlgorithm):
         zs = costs + (1. - terminals) * self.discount * next_qvals_cost
         dv = self.dual_var
 
+
         f_train_qf = self.opt_info["f_train_qf"]
         f_train_qf_cost = self.opt_info["f_train_qf_cost"]
         f_train_policy = self.opt_info["f_train_policy"]
