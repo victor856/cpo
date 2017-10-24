@@ -228,6 +228,7 @@ class PDO_DDPG(RLAlgorithm):
 
         self.offline_mode = offline_mode
         self.offline_itr_n = offline_itr_n
+        self.prev_dual = self.dual_var
 
     def start_worker(self):
         parallel_sampler.populate_task(self.env, self.policy)
@@ -439,10 +440,13 @@ class PDO_DDPG(RLAlgorithm):
             self.qf_cost.get_param_values() * self.soft_target_tau)
 
         #Update dual variable using the sampled gradient
+        beta = 0.9
         opt_actions,_ = self.policy.get_actions(obs)
         gradient_dual = np.mean(self.qf_cost.get_qval(obs, opt_actions) - \
             self.scale_cost * self.cost_constraint)
-        self.dual_var = max(0, self.dual_var + self.dual_learning_rate * gradient_dual) 
+        momentum = self.dual_var - self.prev_dual
+        self.prev_dual = self.dual_var
+        self.dual_var = max(0, self.dual_var + self.dual_learning_rate * gradient_dual + beta * momentum) 
 
 
         self.qf_loss_averages.append(qf_loss)
@@ -477,7 +481,7 @@ class PDO_DDPG(RLAlgorithm):
 
         returns = [sum(path["rewards"]) for path in paths]
         for path in paths:
-            path["safety_rewards"] = self.safety_constraint.evaluate(path)
+            path["safety_rewards"] = self.safety_constraint.evaluate(path) * self.env.bomb_cost
         costs = [sum(path["safety_rewards"]) for path in paths]
 
         all_qs = np.concatenate(self.q_averages)

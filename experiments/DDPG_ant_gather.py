@@ -16,7 +16,7 @@ from rllab.policies.deterministic_mlp_policy import DeterministicMLPPolicy
 #from sandbox.cpo.baselines.gaussian_mlp_baseline import GaussianMLPBaseline
 
 # Environment
-from sandbox.cpo.envs.mujoco.gather.point_gather_env import PointGatherEnv
+from sandbox.cpo.envs.mujoco.gather.ant_gather_env import AntGatherEnv
 
 # Policy optimization
 from sandbox.cpo.algos.safe.PDO_DDPG import PDO_DDPG
@@ -33,7 +33,7 @@ def run_task(*_):
 
         f = open('/home/qingkai/ddpg_performance.csv', "w+")
 
-        env = PointGatherEnv(apple_reward=10,bomb_cost=1,n_apples=2, activity_range=6)
+        env = AntGatherEnv(apple_reward=10,bomb_cost=1,n_apples=2, activity_range=6)
 
         policy = DeterministicMLPPolicy(
             env_spec=env.spec,
@@ -69,7 +69,7 @@ def run_task(*_):
             dual_learning_rate=1e-3,
             policy_learning_rate=1e-3,
             scale_reward=1,
-            scale_cost=20,
+            scale_cost=1,
             soft_target=True,
             soft_target_tau=0.001,
             eval_samples=10000,
