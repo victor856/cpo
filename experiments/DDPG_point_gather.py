@@ -33,7 +33,7 @@ def run_task(*_):
 
         f = open('/home/qingkai/ddpg_performance.csv', "w+")
 
-        env = PointGatherEnv(apple_reward=10,bomb_cost=1,n_apples=2, activity_range=6)
+        env = PointGatherEnv(apple_reward=10,bomb_cost=10,n_apples=2, activity_range=6)
 
         policy = DeterministicMLPPolicy(
             env_spec=env.spec,
@@ -46,7 +46,7 @@ def run_task(*_):
         qf_cost = ContinuousMLPQFunction(env_spec=env.spec)
 
 
-        safety_constraint = GatherSafetyConstraint(max_value=0.1)
+        safety_constraint = GatherSafetyConstraint(max_value=2)
 
 
 
@@ -58,18 +58,18 @@ def run_task(*_):
             qf_cost=qf_cost,
             dual_var=0,
             safety_constraint=safety_constraint,
-            batch_size=128,
+            batch_size=64,
             max_path_length=15,
-            epoch_length=10000,
+            epoch_length=5000,
             min_pool_size=10000,
             n_epochs=200,
-            discount=0.99,
+            discount=0.995,
             qf_learning_rate=1e-3,
             qf_cost_learning_rate=1e-3,
             dual_learning_rate=1e-2,
             policy_learning_rate=1e-3,
-            scale_reward=1,
-            scale_cost=10,
+            scale_reward=0.05,
+            scale_cost=1,
             soft_target=True,
             soft_target_tau=0.001,
             eval_samples=10000,

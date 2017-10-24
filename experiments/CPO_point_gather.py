@@ -32,7 +32,7 @@ def run_task(*_):
         trpo_stepsize = 0.01
         trpo_subsample_factor = 0.2
         
-        env = PointGatherEnv(apple_reward=10,bomb_cost=1,n_apples=2, activity_range=6)
+        env = PointGatherEnv(apple_reward=10,bomb_cost=10,n_apples=2, activity_range=6)
 
         policy = GaussianMLPPolicy(env.spec,
                     hidden_sizes=(64,32)
@@ -61,7 +61,7 @@ def run_task(*_):
             target_key='safety_returns',
             )
 
-        safety_constraint = GatherSafetyConstraint(max_value=0.1, baseline=safety_baseline)
+        safety_constraint = GatherSafetyConstraint(max_value=2, baseline=safety_baseline)
 
 
 
