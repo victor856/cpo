@@ -8,6 +8,7 @@ import itertools
 import numpy as np
 from rllab.misc.ext import sliced_fun
 from _ast import Num
+import csv
 
 
 class PerlmutterHvp(Serializable):
@@ -164,6 +165,7 @@ class ConjugateConstraintOptimizer(Serializable):
         if hvp_approach is None:
             hvp_approach = PerlmutterHvp(num_slices)
         self._hvp_approach = hvp_approach
+        self.nu = 0
 
 
     def update_opt(self, loss, target, quad_leq_constraint, lin_leq_constraint, inputs, 
@@ -543,6 +545,10 @@ class ConjugateConstraintOptimizer(Serializable):
                                                         # 0 : trust region does not intersect safe region
         logger.record_tabular("LagrangeLamda", lam) # dual variable for trust region
         logger.record_tabular("LagrangeNu", nu)     # dual variable for safety constraint
+        f = open("/home/qingkai/cpo_dual.csv", 'a')
+        writer = csv.writer(f, delimiter=',')               
+        writer.writerow((nu, lam))
+        f.close()         
         logger.record_tabular("OptimDiagnostic_q",q) # approx = g^T H^{-1} g
         logger.record_tabular("OptimDiagnostic_r",r) # approx = b^T H^{-1} g
         logger.record_tabular("OptimDiagnostic_s",s) # approx = b^T H^{-1} b

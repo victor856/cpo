@@ -60,7 +60,7 @@ def run_task(*_):
             safety_constraint=safety_constraint,
             batch_size=64,
             max_path_length=15,
-            epoch_length=5000,
+            epoch_length=10000,
             min_pool_size=10000,
             n_epochs=200,
             discount=0.995,

@@ -440,7 +440,7 @@ class PDO_DDPG(RLAlgorithm):
             self.qf_cost.get_param_values() * self.soft_target_tau)
 
         #Update dual variable using the sampled gradient
-        beta = 0.9
+        beta = 0
         opt_actions,_ = self.policy.get_actions(obs)
         gradient_dual = np.mean(self.qf_cost.get_qval(obs, opt_actions) - \
             self.scale_cost * self.cost_constraint)
