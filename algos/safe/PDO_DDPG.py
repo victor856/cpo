@@ -466,11 +466,11 @@ class PDO_DDPG(RLAlgorithm):
     def update_replay_pool_in_batch(self, batch_paths):
             for path in batch_paths:
                 path["safety_rewards"] = self.safety_constraint.evaluate(path)
+                terminal = False
                 for i in range(len(path['rewards'])):
-                    self.pool.add_sample(path['observations'][i], \
-                        path['actions'][i], \
-                        path['rewards'][i] * self.scale_reward, \
-                        path['safety_rewards'][i] * self.scale_cost, False)
+                	if i >= self.max_path_length:
+                		terminal = True
+                	self.pool.add_sample(path['observations'][i], path['actions'][i], path['rewards'][i] * self.scale_reward, path['safety_rewards'][i] * self.scale_cost, terminal)
 
     def evaluate(self, epoch, pool):
         logger.log("Collecting samples for evaluation")

@@ -71,7 +71,7 @@ def run_task(*_):
             policy=policy,
             baseline=baseline,
             safety_constraint=safety_constraint,
-            batch_size=20000,
+            batch_size=10000,
             max_path_length=15,
             n_itr=200,
             gae_lambda=0.95,
@@ -93,7 +93,8 @@ def run_task(*_):
             offline_itr_n=50000,
             balance=0,
             safety_tradeoff_coeff_lr=1e-2,    
-            avg_horizon=200,      
+            avg_horizon=200,
+            adjust_epoch=5,      
             #plot=True,
         )
 

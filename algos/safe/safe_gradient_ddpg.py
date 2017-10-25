@@ -95,6 +95,7 @@ class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
             ddpg_avg_horizon=200,
             offline_itr_n=10000,
             balance=0.5,
+            adjust_epoch=5,
             **kwargs):
 
 
@@ -214,6 +215,8 @@ class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
         self.balance = balance
         self.pdo_dual = safety_tradeoff_coeff
 
+        self.adjust_epoch = adjust_epoch
+
     @overrides
     def train(self):
         self.start_worker()
@@ -238,7 +241,7 @@ class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
                 # self.target_qf_cost = pickle.loads(pickle.dumps(qf_cost)) 
                 
                 self.pdo_ddpg.update_replay_pool_in_batch(paths)
-                if itr == 5:
+                if itr == self.adjust_epoch:
                     logger.log('Calculating off-policy dual variable...')
                     self.pdo_ddpg.train()
                     self.safety_tradeoff_coeff = self.pdo_ddpg.avg_dual
