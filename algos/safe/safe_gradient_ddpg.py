@@ -92,6 +92,7 @@ class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
             ddpg_policy_learning_rate=1e-3,
             ddpg_scale_reward=1.0,
             ddpg_scale_cost=1.0,
+            ddpg_avg_horizon=200,
             offline_itr_n=10000,
             balance=0.5,
             **kwargs):
@@ -204,7 +205,8 @@ class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
             scale_reward=ddpg_scale_reward,
             scale_cost=ddpg_scale_cost,
             offline_mode=True,
-            offline_itr_n=offline_itr_n
+            offline_itr_n=offline_itr_n,
+            avg_horizon=ddpg_avg_horizon
             #plot=True,
         )
 
@@ -219,7 +221,7 @@ class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
         for itr in range(self.current_itr, self.n_itr):
             with logger.prefix('itr #%d | ' % itr):
                 paths = self.sampler.obtain_samples(itr)
-                logger.log('Calculating off-policy dual variable...')
+
                 # # reinitialize ddpg
                 # po = DeterministicMLPPolicy(
                 #     env_spec=self.env.spec,
@@ -234,8 +236,19 @@ class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
                 # self.target_policy = pickle.loads(pickle.dumps(po))
                 # self.target_qf = pickle.loads(pickle.dumps(qf))
                 # self.target_qf_cost = pickle.loads(pickle.dumps(qf_cost)) 
+                
                 self.pdo_ddpg.update_replay_pool_in_batch(paths)
-                self.pdo_ddpg.train()
+                if itr == 5:
+                    logger.log('Calculating off-policy dual variable...')
+                    self.pdo_ddpg.train()
+                    self.safety_tradeoff_coeff = self.pdo_ddpg.avg_dual
+                    all_qs_cost = np.concatenate(self.pdo_ddpg.q_cost_averages)
+                    self.pdo_ddpg.q_cost_averages = []
+                    all_qs = np.concatenate(self.pdo_ddpg.q_averages)
+                    self.pdo_ddpg.q_averages = []          
+                    logger.record_tabular('EstimatedReward', np.mean(all_qs)/self.pdo_ddpg.scale_reward)  
+                    logger.record_tabular('EstimatedCost', np.mean(all_qs_cost)/self.pdo_ddpg.scale_cost)    
+                                    
                 samples_data = self.sampler.process_samples(itr, paths)
                 self.log_diagnostics(paths)
                 self.optimize_policy(itr, samples_data)               
@@ -470,15 +483,15 @@ class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
 
         if self.learn_safety_tradeoff_coeff:
             delta = samples_data['safety_eval'] - self.safety_step_size
-            self.pdo_dual +=  (self.safety_tradeoff_coeff_lr * delta )
-            self.pdo_dual = max(0, self.pdo_dual)
-            self.safety_tradeoff_coeff = self.balance *self.pdo_dual + (1 - self.balance) * self.pdo_ddpg.dual_var * self.pdo_ddpg.scale_cost
+            self.safety_tradeoff_coeff +=  (self.safety_tradeoff_coeff_lr * delta )
+            self.safety_tradeoff_coeff = max(0, self.safety_tradeoff_coeff)            
+            #self.pdo_dual +=  (self.safety_tradeoff_coeff_lr * delta )
+            #self.pdo_dual = max(0, self.pdo_dual)
+            #self.safety_tradeoff_coeff = self.balance *self.pdo_dual + (1 - self.balance) * self.pdo_ddpg.avg_dual
             logger.record_tabular('On-policy Dual', self.pdo_dual)  
             logger.record_tabular('Off-policy Dual', self.pdo_ddpg.dual_var)  
             logger.record_tabular('DualfAfter',self.safety_tradeoff_coeff)
-            all_qs_cost = np.concatenate(self.pdo_ddpg.q_cost_averages)
-            self.pdo_ddpg.q_cost_averages = []
-            logger.record_tabular('EstimatedCost', np.mean(all_qs_cost)/self.pdo_ddpg.scale_cost)
+
             
         logger.record_tabular('Time',time.time() - self.start_time)
         logger.record_tabular('LossBefore', loss_before)

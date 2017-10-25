@@ -36,7 +36,7 @@ def run_task(*_):
         trpo_stepsize = 0.01
         trpo_subsample_factor = 0.2
         
-        env = PointGatherEnv(apple_reward=10,bomb_cost=10,n_apples=2, activity_range=6)
+        env = PointGatherEnv(apple_reward=10,bomb_cost=1,n_apples=2, activity_range=6)
 
         policy = GaussianMLPPolicy(env.spec,
                     hidden_sizes=(64,32)
@@ -53,7 +53,7 @@ def run_task(*_):
                     }
         )
 
-        safety_constraint = GatherSafetyConstraint(max_value=2)
+        safety_constraint = GatherSafetyConstraint(max_value=0.2)
         
         ddpg_policy = DeterministicMLPPolicy(
             env_spec=env.spec,
@@ -71,9 +71,9 @@ def run_task(*_):
             policy=policy,
             baseline=baseline,
             safety_constraint=safety_constraint,
-            batch_size=5000,
+            batch_size=20000,
             max_path_length=15,
-            n_itr=150,
+            n_itr=200,
             gae_lambda=0.95,
             discount=0.995,
             step_size=trpo_stepsize,
@@ -83,15 +83,17 @@ def run_task(*_):
             ddpg_qf_cost=ddpg_qf_cost,            
             ddpg_es=ddpg_es,
             ddpg_dual_var=0,
-            ddpg_batch_size=128,
+            ddpg_batch_size=64,
             ddpg_qf_learning_rate=1e-3,
             ddpg_qf_cost_learning_rate=1e-3,
             ddpg_dual_learning_rate=1e-3,
             ddpg_policy_learning_rate=1e-3,
             ddpg_scale_reward=1,
             ddpg_scale_cost=10,
-            offline_itr_n=10000,
-            balance=0,           
+            offline_itr_n=50000,
+            balance=0,
+            safety_tradeoff_coeff_lr=1e-2,    
+            avg_horizon=200,      
             #plot=True,
         )
 

@@ -126,6 +126,7 @@ class PDO_DDPG(RLAlgorithm):
             plot=False,
             offline_mode=False,
             offline_itr_n=10000,
+            avg_horizon = 200,
             pause_for_plot=False):
         """
         :param env: Environment
@@ -229,6 +230,9 @@ class PDO_DDPG(RLAlgorithm):
         self.offline_mode = offline_mode
         self.offline_itr_n = offline_itr_n
         self.prev_dual = self.dual_var
+        self.avg_dual = self.dual_var
+        self.dual_history = []
+        self.avg_horizon = avg_horizon
 
     def start_worker(self):
         parallel_sampler.populate_task(self.env, self.policy)
@@ -414,7 +418,6 @@ class PDO_DDPG(RLAlgorithm):
         zs = costs + (1. - terminals) * self.discount * next_qvals_cost
         dv = self.dual_var
 
-
         f_train_qf = self.opt_info["f_train_qf"]
         f_train_qf_cost = self.opt_info["f_train_qf_cost"]
         f_train_policy = self.opt_info["f_train_policy"]
@@ -442,12 +445,15 @@ class PDO_DDPG(RLAlgorithm):
         #Update dual variable using the sampled gradient
         beta = 0
         opt_actions,_ = self.policy.get_actions(obs)
-        gradient_dual = np.mean(self.qf_cost.get_qval(obs, opt_actions) - \
+        gradient_dual = np.mean(self.qf_cost.get_qval(obs, actions) - \
             self.scale_cost * self.cost_constraint)
         momentum = self.dual_var - self.prev_dual
         self.prev_dual = self.dual_var
         self.dual_var = max(0, self.dual_var + self.dual_learning_rate * gradient_dual + beta * momentum) 
-
+        self.dual_history.append(self.dual_var)
+        if len(self.dual_history) > self.avg_horizon:
+        	self.dual_history.pop(0)
+        self.avg_dual = np.mean(self.dual_history)
 
         self.qf_loss_averages.append(qf_loss)
         self.qf_cost_loss_averages.append(qf_cost_loss)
