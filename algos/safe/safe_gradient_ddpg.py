@@ -244,6 +244,7 @@ class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
                 if itr == self.adjust_epoch:
                     logger.log('Calculating off-policy dual variable...')
                     self.pdo_ddpg.train()
+                    print(self.pdo_ddpg.dual_history[::250])
                     self.safety_tradeoff_coeff = self.pdo_ddpg.avg_dual
                     all_qs_cost = np.concatenate(self.pdo_ddpg.q_cost_averages)
                     self.pdo_ddpg.q_cost_averages = []
