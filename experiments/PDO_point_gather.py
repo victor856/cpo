@@ -49,7 +49,7 @@ def run_task(*_):
                     }
         )
 
-        safety_constraint = GatherSafetyConstraint(max_value=0.1)
+        safety_constraint = GatherSafetyConstraint(max_value=0.2)
 
 
 
@@ -58,11 +58,12 @@ def run_task(*_):
             policy=policy,
             baseline=baseline,
             safety_constraint=safety_constraint,
-            batch_size=10000,
+            batch_size=50000,
             max_path_length=15,
             n_itr=100,
             gae_lambda=0.95,
             discount=0.995,
+            safety_tradeoff_coeff_lr=1e-1,
             step_size=trpo_stepsize,
             optimizer_args={'subsample_factor':trpo_subsample_factor},
             #plot=True,
