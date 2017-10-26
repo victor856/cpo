@@ -126,7 +126,7 @@ class PDO_DDPG(RLAlgorithm):
             plot=False,
             offline_mode=False,
             offline_itr_n=10000,
-            avg_horizon = 200,
+            avg_horizon = 25000,
             pause_for_plot=False):
         """
         :param env: Environment
@@ -453,7 +453,8 @@ class PDO_DDPG(RLAlgorithm):
         self.dual_history.append(self.dual_var)
         if len(self.dual_history) > self.avg_horizon:
         	self.dual_history.pop(0)
-        self.avg_dual = np.mean(self.dual_history)
+        if len(self.dual_history) >= self.avg_horizon:
+        	self.avg_dual = np.mean(self.dual_history[::250])
 
         self.qf_loss_averages.append(qf_loss)
         self.qf_cost_loss_averages.append(qf_cost_loss)

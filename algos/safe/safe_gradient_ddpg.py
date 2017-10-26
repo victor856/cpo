@@ -244,6 +244,7 @@ class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
                 if itr == self.adjust_epoch:
                     logger.log('Calculating off-policy dual variable...')
                     self.pdo_ddpg.train()
+                    print(self.pdo_ddpg.dual_history[0::250])
                     self.safety_tradeoff_coeff = self.pdo_ddpg.avg_dual
                     all_qs_cost = np.concatenate(self.pdo_ddpg.q_cost_averages)
                     self.pdo_ddpg.q_cost_averages = []
@@ -492,7 +493,7 @@ class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
             #self.pdo_dual = max(0, self.pdo_dual)
             #self.safety_tradeoff_coeff = self.balance *self.pdo_dual + (1 - self.balance) * self.pdo_ddpg.avg_dual
             logger.record_tabular('On-policy Dual', self.pdo_dual)  
-            logger.record_tabular('Off-policy Dual', self.pdo_ddpg.dual_var)  
+            logger.record_tabular('Off-policy Dual', self.pdo_ddpg.avg_dual)  
             logger.record_tabular('DualfAfter',self.safety_tradeoff_coeff)
 
             
