@@ -297,7 +297,7 @@ class PDO_DDPG(RLAlgorithm):
 
                     observation = next_observation
 
-                    if self.pool.size >= self.min_pool_size:
+                    if self.pool.size >= self.min_pool_size and epoch_itr % 100:
                         for update_itr in range(self.n_updates_per_sample):
                             # Train policy
                             batch = self.pool.random_batch(self.batch_size)
@@ -554,8 +554,7 @@ class PDO_DDPG(RLAlgorithm):
 
         f = open("/home/qingkai/ddpg_performance.csv", 'a')
         writer = csv.writer(f, delimiter=',')
-        writer.writerow((epoch, np.mean(returns), np.mean(costs), self.dual_var, \
-            np.mean(all_qs)/self.scale_reward, np.mean(all_qs_cost)/self.scale_cost))
+        writer.writerow((epoch, average_discounted_return, np.mean(costs), self.dual_var))
         f.close()
 
 

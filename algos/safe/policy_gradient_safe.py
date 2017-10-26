@@ -318,7 +318,7 @@ class PolicyGradientSafe(BatchPolopt, Serializable):
                 loss=surr_loss,
                 target=self.policy,
                 quad_leq_constraint=(mean_kl, self.step_size),
-                lin_leq_constraint=(f_safety, self.safety_step_size),
+                lin_leq_constraint=(f_safety/self.safety_gradient_rescale, self.safety_step_size/self.safety_gradient_rescale),
                 inputs=input_list,
                 constraint_name_1="mean_kl",
                 constraint_name_2="safety",
@@ -394,7 +394,7 @@ class PolicyGradientSafe(BatchPolopt, Serializable):
                 logger.record_tabular('SafetyOffset',samples_data['safety_offset'])
 
             self.optimizer.optimize(all_input_values,
-                    precomputed_eval = samples_data['safety_eval'],
+                    precomputed_eval = samples_data['safety_eval']/self.safety_gradient_rescale,
                     precomputed_threshold = threshold,
                     diff_threshold=True)
 
