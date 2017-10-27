@@ -12,6 +12,8 @@ import numpy as np
 import pyprind
 import lasagne
 import csv
+from rllab.q_functions.continuous_mlp_q_function import ContinuousMLPQFunction
+from rllab.policies.deterministic_mlp_policy import DeterministicMLPPolicy
 
 
 def parse_update_method(update_method, **kwargs):
@@ -296,13 +298,20 @@ class PDO_DDPG(RLAlgorithm):
                         self.pool.add_sample(observation, action, reward * self.scale_reward, cost * self.scale_cost, terminal)
 
                     observation = next_observation
-
-                    if self.pool.size >= self.min_pool_size and epoch_itr % 100:
+                    if self.pool.size >= self.min_pool_size:
                         for update_itr in range(self.n_updates_per_sample):
                             # Train policy
                             batch = self.pool.random_batch(self.batch_size)
                             self.do_training(itr, batch)
                         sample_policy.set_param_values(self.policy.get_param_values())
+                        if itr % 100000 == 0:
+                            self.qf=ContinuousMLPQFunction(env_spec=self.env.spec)
+                            self.qf_cost=ContinuousMLPQFunction(env_spec=self.env.spec)
+                            self.policy = DeterministicMLPPolicy(env_spec=self.env.spec,hidden_sizes=(64, 32))
+                            self.target_policy = pickle.loads(pickle.dumps(self.policy))
+                            self.target_qf = pickle.loads(pickle.dumps(self.qf))
+                            self.target_qf_cost = pickle.loads(pickle.dumps(self.qf_cost))
+                            self.init_opt()
 
                     itr += 1
 
