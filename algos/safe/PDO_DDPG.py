@@ -304,14 +304,6 @@ class PDO_DDPG(RLAlgorithm):
                             batch = self.pool.random_batch(self.batch_size)
                             self.do_training(itr, batch)
                         sample_policy.set_param_values(self.policy.get_param_values())
-                        # if itr % 100000 == 0:
-                        #     self.qf=ContinuousMLPQFunction(env_spec=self.env.spec)
-                        #     self.qf_cost=ContinuousMLPQFunction(env_spec=self.env.spec)
-                        #     self.policy = DeterministicMLPPolicy(env_spec=self.env.spec,hidden_sizes=(64, 32))
-                        #     self.target_policy = pickle.loads(pickle.dumps(self.policy))
-                        #     self.target_qf = pickle.loads(pickle.dumps(self.qf))
-                        #     self.target_qf_cost = pickle.loads(pickle.dumps(self.qf_cost))
-                        #     self.init_opt()
 
                     itr += 1
 
@@ -557,6 +549,7 @@ class PDO_DDPG(RLAlgorithm):
         logger.record_tabular('AverageQcostLoss', average_q_cost_loss)
         logger.record_tabular('AverageCosts', np.mean(costs))
         logger.record_tabular('DualVariable', self.dual_var)
+        logger.record_tabular('AvgDual', np.mean(self.dual_history[::200]))
         self.env.log_diagnostics(paths)
         self.policy.log_diagnostics(paths)
         print(self.dual_history[::200])
