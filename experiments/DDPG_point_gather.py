@@ -42,8 +42,8 @@ def run_task(*_):
 
         es = OUStrategy(env_spec=env.spec)
 
-        qf = ContinuousMLPQFunction(env_spec=env.spec)
-        qf_cost = ContinuousMLPQFunction(env_spec=env.spec)
+        qf = ContinuousMLPQFunction(env_spec=env.spec, hidden_sizes=(100,100))
+        qf_cost = ContinuousMLPQFunction(env_spec=env.spec, hidden_sizes=(100,100))
 
 
         safety_constraint = GatherSafetyConstraint(max_value=0.2)
@@ -60,7 +60,7 @@ def run_task(*_):
             safety_constraint=safety_constraint,
             batch_size=64,
             max_path_length=15,
-            epoch_length=50000,
+            epoch_length=10000,
             min_pool_size=10000,
             n_epochs=150,
             discount=0.995,
@@ -68,11 +68,13 @@ def run_task(*_):
             qf_cost_learning_rate=1e-3,
             dual_learning_rate=1e-3,
             policy_learning_rate=1e-3,
-            scale_reward=1,
-            scale_cost=10,
+            scale_reward=0.1,
+            scale_cost=1,
             soft_target=True,
             soft_target_tau=0.001,
             eval_samples=10000,
+            qf_weight_decay=0.,
+            avg_horizon=100000,
             #plot=True,
         )
 

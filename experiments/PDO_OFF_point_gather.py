@@ -62,9 +62,10 @@ def run_task(*_):
 
         ddpg_es = OUStrategy(env_spec=env.spec)
 
-        ddpg_qf = ContinuousMLPQFunction(env_spec=env.spec)
-        ddpg_qf_cost = ContinuousMLPQFunction(env_spec=env.spec)
+        ddpg_qf = ContinuousMLPQFunction(env_spec=env.spec, hidden_sizes=(100,100))
+        ddpg_qf_cost = ContinuousMLPQFunction(env_spec=env.spec, hidden_sizes=(100,100))
 
+        offline_itr_n = 100000
 
         algo = PDO_OFF(
             env=env,
@@ -84,17 +85,18 @@ def run_task(*_):
             ddpg_es=ddpg_es,
             ddpg_dual_var=0,
             ddpg_batch_size=64,
-            ddpg_qf_learning_rate=1e-3,
-            ddpg_qf_cost_learning_rate=1e-3,
+            ddpg_qf_learning_rate=1e-4,
+            ddpg_qf_cost_learning_rate=1e-4,
             ddpg_dual_learning_rate=1e-3,
             ddpg_policy_learning_rate=1e-3,
             ddpg_scale_reward=1,
-            ddpg_scale_cost=10,
-            offline_itr_n=50000,
+            ddpg_scale_cost=1,
+            offline_itr_n=offline_itr_n,
             balance=0,
             safety_tradeoff_coeff_lr=1e-2,    
-            ddpg_avg_horizon=25000,
-            adjust_epoch=5,      
+            ddpg_avg_horizon=offline_itr_n,
+            adjust_epoch=5,
+            ddpg_qf_weight_decay=0.,      
             #plot=True,
         )
 

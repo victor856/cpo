@@ -96,6 +96,7 @@ class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
             offline_itr_n=10000,
             balance=0.5,
             adjust_epoch=5,
+            ddpg_qf_weight_decay=0.,
             **kwargs):
 
 
@@ -207,7 +208,8 @@ class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
             scale_cost=ddpg_scale_cost,
             offline_mode=True,
             offline_itr_n=offline_itr_n,
-            avg_horizon=ddpg_avg_horizon
+            avg_horizon=ddpg_avg_horizon,
+            qf_weight_decay=ddpg_qf_weight_decay,
             #plot=True,
         )
 
@@ -244,7 +246,7 @@ class PolicyGradientSafeDDPG(BatchPolopt, Serializable):
                 if itr == self.adjust_epoch:
                     logger.log('Calculating off-policy dual variable...')
                     self.pdo_ddpg.train()
-                    print(self.pdo_ddpg.dual_history[::250])
+                    print(self.pdo_ddpg.dual_history[::200])
                     self.safety_tradeoff_coeff = self.pdo_ddpg.avg_dual
                     all_qs_cost = np.concatenate(self.pdo_ddpg.q_cost_averages)
                     self.pdo_ddpg.q_cost_averages = []

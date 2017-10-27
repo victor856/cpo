@@ -127,8 +127,8 @@ class PDO_DDPG(RLAlgorithm):
             include_horizon_terminal_transitions=False,
             plot=False,
             offline_mode=False,
-            offline_itr_n=10000,
-            avg_horizon = 25000,
+            offline_itr_n=100000,
+            avg_horizon = 100000,
             pause_for_plot=False):
         """
         :param env: Environment
@@ -293,9 +293,9 @@ class PDO_DDPG(RLAlgorithm):
                         terminal = True
                         # only include the terminal transition in this case if the flag was set
                         if self.include_horizon_terminal_transitions:
-                            self.pool.add_sample(observation, action, reward * self.scale_reward, cost * self.scale_cost, terminal)
+                            self.pool.add_sample(observation, action, reward * self.scale_reward, cost  * self.scale_cost, terminal)
                     else:
-                        self.pool.add_sample(observation, action, reward * self.scale_reward, cost * self.scale_cost, terminal)
+                        self.pool.add_sample(observation, action, reward * self.scale_reward, cost  * self.scale_cost, terminal)
 
                     observation = next_observation
                     if self.pool.size >= self.min_pool_size:
@@ -304,14 +304,14 @@ class PDO_DDPG(RLAlgorithm):
                             batch = self.pool.random_batch(self.batch_size)
                             self.do_training(itr, batch)
                         sample_policy.set_param_values(self.policy.get_param_values())
-                        if itr % 100000 == 0:
-                            self.qf=ContinuousMLPQFunction(env_spec=self.env.spec)
-                            self.qf_cost=ContinuousMLPQFunction(env_spec=self.env.spec)
-                            self.policy = DeterministicMLPPolicy(env_spec=self.env.spec,hidden_sizes=(64, 32))
-                            self.target_policy = pickle.loads(pickle.dumps(self.policy))
-                            self.target_qf = pickle.loads(pickle.dumps(self.qf))
-                            self.target_qf_cost = pickle.loads(pickle.dumps(self.qf_cost))
-                            self.init_opt()
+                        # if itr % 100000 == 0:
+                        #     self.qf=ContinuousMLPQFunction(env_spec=self.env.spec)
+                        #     self.qf_cost=ContinuousMLPQFunction(env_spec=self.env.spec)
+                        #     self.policy = DeterministicMLPPolicy(env_spec=self.env.spec,hidden_sizes=(64, 32))
+                        #     self.target_policy = pickle.loads(pickle.dumps(self.policy))
+                        #     self.target_qf = pickle.loads(pickle.dumps(self.qf))
+                        #     self.target_qf_cost = pickle.loads(pickle.dumps(self.qf_cost))
+                        #     self.init_opt()
 
                     itr += 1
 
@@ -423,7 +423,7 @@ class PDO_DDPG(RLAlgorithm):
         next_qvals_cost = self.target_qf_cost.get_qval(next_obs, next_actions)
 
     
-        ys = rewards + (1. - terminals) * self.discount * next_qvals
+        ys = rewards  + (1. - terminals) * self.discount * next_qvals
         zs = costs + (1. - terminals) * self.discount * next_qvals_cost
         dv = self.dual_var
 
@@ -462,8 +462,7 @@ class PDO_DDPG(RLAlgorithm):
         self.dual_history.append(self.dual_var)
         if len(self.dual_history) > self.avg_horizon:
         	self.dual_history.pop(0)
-        if len(self.dual_history) >= self.avg_horizon:
-        	self.avg_dual = np.mean(self.dual_history[::250])
+        self.avg_dual = np.mean(self.dual_history[::200])
 
         self.qf_loss_averages.append(qf_loss)
         self.qf_cost_loss_averages.append(qf_cost_loss)
@@ -560,10 +559,11 @@ class PDO_DDPG(RLAlgorithm):
         logger.record_tabular('DualVariable', self.dual_var)
         self.env.log_diagnostics(paths)
         self.policy.log_diagnostics(paths)
+        print(self.dual_history[::200])
 
         f = open("/home/qingkai/ddpg_performance.csv", 'a')
         writer = csv.writer(f, delimiter=',')
-        writer.writerow((epoch, average_discounted_return, np.mean(costs), self.dual_var))
+        writer.writerow((epoch, average_discounted_return, np.mean(costs), self.dual_var, np.mean(all_qs), np.mean(all_qs_cost)))
         f.close()
 
 
