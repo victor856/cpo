@@ -247,6 +247,8 @@ class PDO_DDPG(RLAlgorithm):
     def train(self):
 
         self.init_opt()
+        init_qf = pickle.loads(pickle.dumps(self.qf))
+        init_qf_cost = pickle.loads(pickle.dumps(self.qf_cost))
         # This seems like a rather sequential method
         if self.offline_mode:
             for itr in range(self.offline_itr_n):
@@ -306,14 +308,13 @@ class PDO_DDPG(RLAlgorithm):
                             batch = self.pool.random_batch(self.batch_size)
                             self.do_training(itr, batch)
                         sample_policy.set_param_values(self.policy.get_param_values())
-                        # if itr % 100000 == 0:
-                        #     self.qf=ContinuousMLPQFunction(env_spec=self.env.spec)
-                        #     self.qf_cost=ContinuousMLPQFunction(env_spec=self.env.spec)
-                        #     self.policy = DeterministicMLPPolicy(env_spec=self.env.spec,hidden_sizes=(64, 32))
-                        #     self.target_policy = pickle.loads(pickle.dumps(self.policy))
-                        #     self.target_qf = pickle.loads(pickle.dumps(self.qf))
-                        #     self.target_qf_cost = pickle.loads(pickle.dumps(self.qf_cost))
-                        #     self.init_opt()
+                        # if itr % 10000 == 0:
+                        #     self.qf.set_param_values(init_qf.get_param_values())
+                        #     self.qf_cost.set_param_values(init_qf_cost.get_param_values())
+                        #     #self.policy = DeterministicMLPPolicy(env_spec=self.env.spec,hidden_sizes=(64, 32))
+                        #     #self.target_policy = pickle.loads(pickle.dumps(self.policy))
+                        #     self.target_qf.set_param_values(self.qf.get_param_values())
+                        #     self.target_qf_cost.set_param_values(self.qf_cost.get_param_values())
 
                     itr += 1
 
@@ -426,7 +427,7 @@ class PDO_DDPG(RLAlgorithm):
 
     
         ys = rewards  + (1. - terminals) * self.discount * next_qvals
-        zs = costs + (1. - terminals) * self.discount * next_qvals_cost
+        zs = costs + (1. - terminals) * self.discount * next_qvals_cost 
         dv = self.dual_var
 
         f_train_qf = self.opt_info["f_train_qf"]
@@ -566,7 +567,7 @@ class PDO_DDPG(RLAlgorithm):
 
         f = open("/home/qingkai/ddpg_performance.csv", 'a')
         writer = csv.writer(f, delimiter=',')
-        writer.writerow((epoch, average_discounted_return, np.mean(costs), self.dual_var, np.mean(all_qs), np.mean(all_qs_cost)))
+        writer.writerow((epoch, np.mean(returns), np.mean(costs), self.dual_var, np.mean(all_qs), np.mean(all_qs_cost), self.avg_dual))
         f.close()
 
 

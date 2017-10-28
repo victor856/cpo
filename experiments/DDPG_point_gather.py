@@ -42,9 +42,8 @@ def run_task(*_):
 
         es = OUStrategy(env_spec=env.spec)
 
-        qf = ContinuousMLPQFunction(env_spec=env.spec, hidden_sizes=(100,100))
-        qf_cost = ContinuousMLPQFunction(env_spec=env.spec, hidden_sizes=(100,100))
-
+        qf = ContinuousMLPQFunction(env_spec=env.spec)
+        qf_cost = ContinuousMLPQFunction(env_spec=env.spec)
 
         safety_constraint = GatherSafetyConstraint(max_value=0.2)
 
@@ -63,17 +62,17 @@ def run_task(*_):
             epoch_length=10000,
             min_pool_size=10000,
             n_epochs=150,
-            discount=0.995,
+            discount=0.99,
             qf_learning_rate=1e-3,
             qf_cost_learning_rate=1e-3,
             dual_learning_rate=1e-2,
             policy_learning_rate=1e-3,
             scale_reward=1,
-            scale_cost=1,
+            scale_cost=5,
             soft_target=True,
             soft_target_tau=0.001,
             eval_samples=10000,
-            qf_weight_decay=5e-3,
+            qf_weight_decay=0.,
             qf_cost_weight_decay=0.,
             avg_horizon=100000,
             #plot=True,
@@ -88,7 +87,7 @@ run_experiment_lite(
     n_parallel=4,
     snapshot_mode="last",
     exp_prefix='PDO_DDPG-PointGather',
-    seed=1,
+    seed=2,
     mode = "ec2" if ec2_mode else "local"
     #plot=True
 )
