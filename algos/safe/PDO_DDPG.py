@@ -113,6 +113,7 @@ class PDO_DDPG(RLAlgorithm):
             qf_cost_update_method='adam',
             qf_learning_rate=1e-3,
             qf_cost_learning_rate=1e-3,
+            qf_cost_weight_decay=0.,
             safety_constraint=None,
             dual_learning_rate=0.01,
             policy_weight_decay=0,
@@ -174,6 +175,7 @@ class PDO_DDPG(RLAlgorithm):
         self.discount = discount
         self.max_path_length = max_path_length
         self.qf_weight_decay = qf_weight_decay
+        self.qf_cost_weight_decay=qf_cost_weight_decay
         self.qf_update_method = \
             parse_update_method(
                 qf_update_method,
@@ -304,6 +306,14 @@ class PDO_DDPG(RLAlgorithm):
                             batch = self.pool.random_batch(self.batch_size)
                             self.do_training(itr, batch)
                         sample_policy.set_param_values(self.policy.get_param_values())
+                        # if itr % 100000 == 0:
+                        #     self.qf=ContinuousMLPQFunction(env_spec=self.env.spec)
+                        #     self.qf_cost=ContinuousMLPQFunction(env_spec=self.env.spec)
+                        #     self.policy = DeterministicMLPPolicy(env_spec=self.env.spec,hidden_sizes=(64, 32))
+                        #     self.target_policy = pickle.loads(pickle.dumps(self.policy))
+                        #     self.target_qf = pickle.loads(pickle.dumps(self.qf))
+                        #     self.target_qf_cost = pickle.loads(pickle.dumps(self.qf_cost))
+                        #     self.init_opt()
 
                     itr += 1
 
@@ -346,7 +356,7 @@ class PDO_DDPG(RLAlgorithm):
         qf_weight_decay_term = 0.5 * self.qf_weight_decay * \
                                sum([TT.sum(TT.square(param)) for param in
                                     self.qf.get_params(regularizable=True)])
-        qf_cost_weight_decay_term = 0.5 * self.qf_weight_decay * \
+        qf_cost_weight_decay_term = 0.5 * self.qf_cost_weight_decay * \
                                sum([TT.sum(TT.square(param)) for param in
                                     self.qf_cost.get_params(regularizable=True)])
 
